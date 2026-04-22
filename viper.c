@@ -50,12 +50,12 @@ typedef struct {
 } Stack;
 
 typedef struct {
+	int depth;
+	U8 flag;
+	S16 score;
 	U64 key;
 	Move move;
-	S16 score;
-	U8 depth;
-	U8 flag;
-}TT_Entry;
+}TTEntry;
 
 typedef struct {
 	U8 post;
@@ -65,9 +65,9 @@ typedef struct {
 	U64 timeLimit;
 	U64 nodes;
 	U64 nodesLimit;
-}SSearchInfo;
+}SearchInfo;
 
-SSearchInfo info;
+SearchInfo info;
 
 U64 ranksBB[8] = {
 	0x00000000000000ffULL,
@@ -246,14 +246,14 @@ int* eg_table[6] = {
 int mg_pst[PT_NB][64];
 int eg_pst[PT_NB][64];
 
-int material[PT_NB] = { 100,320,330,500,900,0 };
+int material[7] = { 100,320,330,500,900,0,0 };
 Stack stack[128];
 U64 keys[848];
 int historyCount = 0;
 U64 historyHash[1024];
 S32 hh_table[2][2][64][64] = { 0 };
 const U64 tt_count = 64ULL << 15;
-TT_Entry tt[64ULL << 15] = { 0 };
+TTEntry tt[64ULL << 15] = { 0 };
 
 void UciCommand(Position* pos, char* line);
 
@@ -803,7 +803,7 @@ static void PrintPv(const Position* pos, const Move move) {
 		return;
 	printf(" %s", MoveToUci(move, pos->flipped));
 	const U64 tt_key = GetHash(&npos);
-	TT_Entry* tt_entry = tt + (tt_key % tt_count);
+	TTEntry* tt_entry = tt + (tt_key % tt_count);
 	if (tt_entry->key != tt_key || tt_entry->flag != EXACT)
 		return;
 	if (IsRepetition(&npos, tt_key))
@@ -824,10 +824,6 @@ static int Permill() {
 static int SearchAlpha(Position* pos, int alpha, int beta, int depth, int ply, Stack* stack) {
 	if (CheckUp(pos))
 		return 0;
-	int  mateValue = MATE - ply;
-	if (alpha < -mateValue) alpha = -mateValue;
-	if (beta > mateValue - 1) beta = mateValue - 1;
-	if (alpha >= beta) return alpha;
 	int  mate_value = MATE - ply;
 	if (alpha < -mate_value)
 		alpha = -mate_value;
@@ -847,7 +843,7 @@ static int SearchAlpha(Position* pos, int alpha, int beta, int depth, int ply, S
 	if (ply && !in_qsearch)
 		if (pos->move50 >= 100 || IsRepetition(pos, hash))
 			return 0;
-	TT_Entry* tt_entry = tt + (hash % tt_count);
+	TTEntry* tt_entry = tt + (hash % tt_count);
 	Move tt_move = { 0 };
 	if (tt_entry->key == hash) {
 		tt_move = tt_entry->move;
@@ -874,11 +870,11 @@ static int SearchAlpha(Position* pos, int alpha, int beta, int depth, int ply, S
 	const int num_moves = MoveGen(pos, moves, in_qsearch);
 	S64 move_scores[256];
 	for (int j = 0; j < num_moves; ++j) {
-		const int capture = PieceTypeOn(pos, moves[j].to);
+		const int captured = PieceTypeOn(pos, moves[j].to);
 		if (Equal(moves[j], tt_move))
 			move_scores[j] = 1LL << 62;
-		else if (capture != PT_NB)
-			move_scores[j] = ((capture + 1) * (1LL << 54)) - PieceTypeOn(pos, moves[j].from);
+		else if (captured != PT_NB)
+			move_scores[j] = ((captured + 1) * (1LL << 54)) - PieceTypeOn(pos, moves[j].from);
 		else if (Equal(moves[j], stack[ply].killer))
 			move_scores[j] = 1LL << 50;
 		else
