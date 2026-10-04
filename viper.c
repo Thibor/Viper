@@ -20,6 +20,22 @@
 #define VERSION "2026-04-08"
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 #define FLIP(sq) ((sq)^56)
+#define RANK_1_BB       (U64)0x00000000000000FF
+#define RANK_2_BB       (U64)0x000000000000FF00
+#define RANK_3_BB       (U64)0x0000000000FF0000
+#define RANK_4_BB       (U64)0x00000000FF000000
+#define RANK_5_BB       (U64)0x000000FF00000000
+#define RANK_6_BB       (U64)0x0000FF0000000000
+#define RANK_7_BB       (U64)0x00FF000000000000
+#define RANK_8_BB       (U64)0xFF00000000000000
+#define FILE_A_BB       (U64)0x0101010101010101
+#define FILE_B_BB       (U64)0x0202020202020202
+#define FILE_C_BB       (U64)0x0404040404040404
+#define FILE_D_BB       (U64)0x0808080808080808
+#define FILE_E_BB       (U64)0x1010101010101010
+#define FILE_F_BB       (U64)0x2020202020202020
+#define FILE_G_BB       (U64)0x4040404040404040
+#define FILE_H_BB       (U64)0x8080808080808080
 
 enum Color { WHITE, BLACK, COLOR_NB };
 enum PieceType { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING, PT_NB };
@@ -29,8 +45,8 @@ typedef struct {
 	U8 flipped;
 	U8 move50;
 	U64 castling[4];
-	U64 color[2];
-	U64 pieces[6];
+	U64 color[COLOR_NB];
+	U64 pieces[PT_NB];
 	U64 ep;
 }Position;
 
@@ -65,11 +81,11 @@ typedef struct {
 	Move move;
 }TTEntry;
 
+int insufVal[PT_NB] = { 5,2,3,5,5,0 };
 int phaseVal[PT_NB] = { 0,1,1,2,4,0 };
-int insufVal[PT_NB] = { 3,1,2,3,3,0 };
 int mg_material[PT_NB] = { 82, 337, 365, 477, 1025, 0 };
 int eg_material[PT_NB] = { 94, 281, 297, 512,  936, 0 };
-int mx_material[PT_NB] = { 94, 337, 365, 477, 1025, 0 };
+int mx_material[7] = { 94, 337, 365, 512, 1025, 0 };
 
 int mg_pawn_table[64] = {
 	  0,   0,   0,   0,   0,   0,  0,   0,
@@ -203,6 +219,70 @@ int eg_king_table[64] = {
 	-53, -34, -21, -11, -28, -14, -24, -43
 };
 
+U64 rook_magic[64] = {
+	0x8a80104000800020ULL, 0x0140002000100040ULL, 0x02801880a0017001ULL, 0x0100081001000420ULL,
+	0x0200020010080420ULL, 0x03001c0002010008ULL, 0x8480008002000100ULL, 0x2080088004402900ULL,
+	0x0000800098204000ULL, 0x2024401000200040ULL, 0x0100802000801000ULL, 0x0120800800801000ULL,
+	0x0208808088000400ULL, 0x0002802200800400ULL, 0x2200800100020080ULL, 0x0801000060821100ULL,
+	0x0080044006422000ULL, 0x0100808020004000ULL, 0x12108a0010204200ULL, 0x0140848010000802ULL,
+	0x0481828014002800ULL, 0x8094004002004100ULL, 0x4010040010010802ULL, 0x0000020008806104ULL,
+	0x0100400080208000ULL, 0x2040002120081000ULL, 0x0021200680100081ULL, 0x0020100080080080ULL,
+	0x0002000a00200410ULL, 0x0000020080800400ULL, 0x0080088400100102ULL, 0x0080004600042881ULL,
+	0x4040008040800020ULL, 0x0440003000200801ULL, 0x0004200011004500ULL, 0x0188020010100100ULL,
+	0x0014800401802800ULL, 0x2080040080800200ULL, 0x0124080204001001ULL, 0x0200046502000484ULL,
+	0x0480400080088020ULL, 0x1000422010034000ULL, 0x0030200100110040ULL, 0x0000100021010009ULL,
+	0x2002080100110004ULL, 0x0202008004008002ULL, 0x0020020004010100ULL, 0x2048440040820001ULL,
+	0x0101002200408200ULL, 0x0040802000401080ULL, 0x4008142004410100ULL, 0x02060820c0120200ULL,
+	0x0001001004080100ULL, 0x020c020080040080ULL, 0x2935610830022400ULL, 0x0044440041009200ULL,
+	0x0280001040802101ULL, 0x2100190040002085ULL, 0x80c0084100102001ULL, 0x4024081001000421ULL,
+	0x00020030a0244872ULL, 0x0012001008414402ULL, 0x02006104900a0804ULL, 0x0001004081002402ULL
+};
+U64 bishop_magic[64] = {
+	0x0040040844404084ULL, 0x002004208a004208ULL, 0x0010190041080202ULL, 0x0108060845042010ULL,
+	0x0581104180800210ULL, 0x2112080446200010ULL, 0x1080820820060210ULL, 0x03c0808410220200ULL,
+	0x0004050404440404ULL, 0x0000021001420088ULL, 0x24d0080801082102ULL, 0x0001020a0a020400ULL,
+	0x0000040308200402ULL, 0x0004011002100800ULL, 0x0401484104104005ULL, 0x0801010402020200ULL,
+	0x00400210c3880100ULL, 0x0404022024108200ULL, 0x0810018200204102ULL, 0x0004002801a02003ULL,
+	0x0085040820080400ULL, 0x810102c808880400ULL, 0x000e900410884800ULL, 0x8002020480840102ULL,
+	0x0220200865090201ULL, 0x2010100a02021202ULL, 0x0152048408022401ULL, 0x0020080002081110ULL,
+	0x4001001021004000ULL, 0x800040400a011002ULL, 0x00e4004081011002ULL, 0x001c004001012080ULL,
+	0x8004200962a00220ULL, 0x8422100208500202ULL, 0x2000402200300c08ULL, 0x8646020080080080ULL,
+	0x80020a0200100808ULL, 0x2010004880111000ULL, 0x623000a080011400ULL, 0x42008c0340209202ULL,
+	0x0209188240001000ULL, 0x400408a884001800ULL, 0x00110400a6080400ULL, 0x1840060a44020800ULL,
+	0x0090080104000041ULL, 0x0201011000808101ULL, 0x1a2208080504f080ULL, 0x8012020600211212ULL,
+	0x0500861011240000ULL, 0x0180806108200800ULL, 0x4000020e01040044ULL, 0x300000261044000aULL,
+	0x0802241102020002ULL, 0x0020906061210001ULL, 0x5a84841004010310ULL, 0x0004010801011c04ULL,
+	0x000a010109502200ULL, 0x0000004a02012000ULL, 0x500201010098b028ULL, 0x8040002811040900ULL,
+	0x0028000010020204ULL, 0x06000020202d0240ULL, 0x8918844842082200ULL, 0x4010011029020020ULL
+};
+
+static const int rook_relevant_bits[64] = {
+	12,11,11,11,11,11,11,12,
+	11,10,10,10,10,10,10,11,
+	11,10,10,10,10,10,10,11,
+	11,10,10,10,10,10,10,11,
+	11,10,10,10,10,10,10,11,
+	11,10,10,10,10,10,10,11,
+	11,10,10,10,10,10,10,11,
+	12,11,11,11,11,11,11,12
+};
+
+static const int bishop_relevant_bits[64] = {
+	6,5,5,5,5,5,5,6,
+	5,5,5,5,5,5,5,5,
+	5,5,7,7,7,7,5,5,
+	5,5,7,9,9,7,5,5,
+	5,5,7,9,9,7,5,5,
+	5,5,7,7,7,7,5,5,
+	5,5,5,5,5,5,5,5,
+	6,5,5,5,5,5,5,6
+};
+
+static U64 bishopMask[64];
+static U64 rookMask[64];
+U64 bishopAttacks[64][512];
+U64 rookAttacks[64][4096];
+
 int* mg_table[6] = {
 	mg_pawn_table,
 	mg_knight_table,
@@ -223,7 +303,6 @@ int* eg_table[6] = {
 
 int mg_pst[PT_NB][64];
 int eg_pst[PT_NB][64];
-//int mx_pst[PT_NB][64];
 U64 keys[848];
 int historyCount = 0;
 U64 historyHash[1024];
@@ -236,56 +315,19 @@ TTEntry tt[64ULL << 15];
 void UciCommand(Position* pos, char* line);
 
 static inline int Equal(const Move lhs, const Move rhs) { return !memcmp(&rhs, &lhs, sizeof(Move)); }
-
-static U64 GetTimeMs() {
-	return GetTickCount64();
-}
-
-static U64 FlipBitboard(const U64 bb) {
-	return _byteswap_uint64(bb);
-}
-
-//Least Significant Bit index
-static U64 LSB(const U64 bb) {
-	return _tzcnt_u64(bb);
-}
-
-//Count set bits on a bitboard
-static U64 Count(const U64 bb) {
-	return _mm_popcnt_u64(bb);
-}
-
-static U64 East(const U64 bb) {
-	return (bb << 1) & ~0x0101010101010101ULL;
-}
-
-static U64 West(const U64 bb) {
-	return (bb >> 1) & ~0x8080808080808080ULL;
-}
-
-static U64 North(const U64 bb) {
-	return bb << 8;
-}
-
-static U64 South(const U64 bb) {
-	return bb >> 8;
-}
-
-static U64 NW(const U64 bb) {
-	return North(West(bb));
-}
-
-static U64 NE(const U64 bb) {
-	return North(East(bb));
-}
-
-static U64 SW(const U64 bb) {
-	return South(West(bb));
-}
-
-static U64 SE(const U64 bb) {
-	return South(East(bb));
-}
+static inline void TTClear() { memset(tt, 0, sizeof(tt)); }
+static inline U64 GetTimeMs() {return GetTickCount64();}
+static inline U64 FlipBitboard(const U64 bb) {return _byteswap_uint64(bb);}
+static inline U64 LSB(const U64 bb) {return _tzcnt_u64(bb);}
+static inline U64 Count(const U64 bb) {return _mm_popcnt_u64(bb);}
+static inline U64 East(const U64 bb) { return (bb << 1) & ~FILE_A_BB; }
+static inline U64 West(const U64 bb) { return (bb >> 1) & ~FILE_H_BB; }
+static inline U64 North(const U64 bb) { return bb << 8; }
+static inline U64 South(const U64 bb) { return bb >> 8; }
+static inline U64 NW(const U64 bb) { return (bb << 7) & ~FILE_H_BB; }
+static inline U64 NE(const U64 bb) { return (bb << 9) & ~FILE_A_BB; }
+static inline U64 SW(const U64 bb) { return (bb >> 9) & ~FILE_H_BB; }
+static inline U64 SE(const U64 bb) { return (bb >> 7) & ~FILE_A_BB; }
 
 static void Swap(U64* a, U64* b) {
 	U64 temp = *a;
@@ -314,7 +356,6 @@ static void Init() {
 		for (int sq = 0; sq < 64; sq++) {
 			mg_pst[pt][sq] = mg_material[pt] + mg_table[pt][FLIP(sq)];
 			eg_pst[pt][sq] = eg_material[pt] + eg_table[pt][FLIP(sq)];
-			//mx_pst[pt][FLIP(sq)] = max(mg_pst[pt][sq], eg_pst[pt][sq]);
 		}
 	}
 }
@@ -344,17 +385,17 @@ static U64 BishopAttackBB(U64 bb, U64 blockers) {
 	return Ray(bb, blockers, NW) | Ray(bb, blockers, NE) | Ray(bb, blockers, SW) | Ray(bb, blockers, SE);
 }
 
-static U64 BishopAttack(const int sq, const U64 blockers) {
+/*static U64 BishopAttack(const int sq, const U64 blockers) {
 	return BishopAttackBB(1ULL << sq, blockers);
-}
+}*/
 
 static U64 RookAttackBB(U64 bb, U64 blockers) {
 	return Ray(bb, blockers, North) | Ray(bb, blockers, East) | Ray(bb, blockers, South) | Ray(bb, blockers, West);
 }
 
-static U64 RookAttack(const int sq, const U64 blockers) {
+/*static U64 RookAttack(const int sq, const U64 blockers) {
 	return RookAttackBB(1ULL << sq, blockers);
-}
+}*/
 
 static U64 KingAttackBB(const U64 bb) {
 	return (bb << 8) | (bb >> 8) | (((bb >> 1) | (bb >> 9) | (bb << 7)) & 0x7F7F7F7F7F7F7F7FULL) |
@@ -363,6 +404,115 @@ static U64 KingAttackBB(const U64 bb) {
 
 static U64 KingAttack(const int sq) {
 	return KingAttackBB(1ULL << sq);
+}
+
+// create mask for slider excluding edge squares
+static U64 mask_rook_attacks(int sq) {
+	U64 attacks = 0ULL;
+	int r = sq / 8, f = sq % 8;
+	// North
+	for (int rr = r + 1; rr <= 6; ++rr) attacks |= (1ULL << (rr * 8 + f));
+	// South
+	for (int rr = r - 1; rr >= 1; --rr) attacks |= (1ULL << (rr * 8 + f));
+	// East
+	for (int ff = f + 1; ff <= 6; ++ff) attacks |= (1ULL << (r * 8 + ff));
+	// West
+	for (int ff = f - 1; ff >= 1; --ff) attacks |= (1ULL << (r * 8 + ff));
+	return attacks;
+}
+
+static U64 MaskBishopAttacks(int sq) {
+	U64 attacks = 0ULL;
+	int r = sq / 8, f = sq % 8;
+	// NE
+	for (int rr = r + 1, ff = f + 1; rr <= 6 && ff <= 6; ++rr, ++ff) attacks |= (1ULL << (rr * 8 + ff));
+	// NW
+	for (int rr = r + 1, ff = f - 1; rr <= 6 && ff >= 1; ++rr, --ff) attacks |= (1ULL << (rr * 8 + ff));
+	// SE
+	for (int rr = r - 1, ff = f + 1; rr >= 1 && ff <= 6; --rr, ++ff) attacks |= (1ULL << (rr * 8 + ff));
+	// SW
+	for (int rr = r - 1, ff = f - 1; rr >= 1 && ff >= 1; --rr, --ff) attacks |= (1ULL << (rr * 8 + ff));
+	return attacks;
+}
+
+/*static U64 SetOccupancy(int index, int bits_in_mask, U64 mask) {
+	U64 occupancy = 0ULL;
+	U64 bit = 1ULL;
+	vector<int> bits;
+	bits.reserve(bits_in_mask);
+	U64 m = mask;
+	while (m) {
+		int sq = LSB(m);
+		bits.push_back(sq);
+		m &= m - 1;
+	}
+	for (int i = 0; i < bits_in_mask; ++i) {
+		if (index & (1 << i))
+			occupancy |= (1ULL << bits[i]);
+	}
+	return occupancy;
+}*/
+
+
+//#define pop_bit(bitboard, sq) ((bitboard) &= ~(1ULL << (sq)))
+
+U64 SetOccupancy(int index, int bits_in_mask, U64 attack_mask) {
+	U64 occupancy = 0ULL;
+	for (int count = 0; count < bits_in_mask; count++) {
+		int square = LSB(attack_mask);
+		//pop_bit(attack_mask, square);
+		//attack_mask &= attack_mask - 1;
+		attack_mask &= ~(1ULL << square);
+		if (index & (1 << count))
+			occupancy |= (1ULL << square);
+	}
+	return occupancy;
+}
+
+static void InitMagics() {
+	// initialize masks and tables
+	memset(bishopAttacks, 0, sizeof(bishopAttacks));
+	memset(rookAttacks, 0, sizeof(rookAttacks));
+	for (int sq = 0; sq < 64; ++sq) {
+		bishopMask[sq] = MaskBishopAttacks(sq);
+		rookMask[sq] = mask_rook_attacks(sq);
+
+		int bbits = bishop_relevant_bits[sq];
+		int rbits = rook_relevant_bits[sq];
+
+		size_t bsize = 1ULL << bbits;
+		size_t rsize = 1ULL << rbits;
+
+		// fill bishop attacks
+		for (size_t index = 0; index < bsize; ++index) {
+			U64 occ = SetOccupancy((int)index, bbits, bishopMask[sq]);
+			U64 attack = BishopAttackBB(1ULL << sq, occ);
+			U64 key = (occ * bishop_magic[sq]) >> (64 - bbits);
+			bishopAttacks[sq][key] = attack;
+		}
+		// fill rook attacks
+		for (size_t index = 0; index < rsize; ++index) {
+			U64 occ = SetOccupancy((int)index, rbits, rookMask[sq]);
+			U64 attack = RookAttackBB(1ULL << sq, occ);
+			U64 key = (occ * rook_magic[sq]) >> (64 - rbits);
+			rookAttacks[sq][key] = attack;
+		}
+	}
+}
+
+// New magic-based accessors
+static U64 BishopAttack(int sq, const U64 blockers) {
+	U64 occ = blockers & bishopMask[sq];
+	int bits = bishop_relevant_bits[sq];
+	U64 index = (occ * bishop_magic[sq]) >> (64 - bits);
+	return bishopAttacks[sq][(size_t)index];
+}
+
+static U64 RookAttack(int sq, const U64 blockers) {
+	U64 occ = blockers & rookMask[sq];
+	int bits = rook_relevant_bits[sq];
+	U64 index = (occ * rook_magic[sq]) >> (64 - bits);
+	return rookAttacks[sq][(size_t)index];
 }
 
 static void FlipPosition(Position* pos) {
@@ -458,12 +608,10 @@ static int MoveGen(const Position* pos, Move* const movelist, int only_captures)
 	GeneratePieceMoves(movelist, &num_moves, pos, ROOK, to_mask, RookAttack);
 	GeneratePieceMoves(movelist, &num_moves, pos, QUEEN, to_mask, RookAttack);
 	GeneratePieceMoves(movelist, &num_moves, pos, KING, to_mask, KingAttack);
-	if (!only_captures && pos->castling[0] && !(all & 0x60ULL) && !Attacked(pos, 4, 1) && !Attacked(pos, 5, 1)) {
+	if (!only_captures && pos->castling[0] && !(all & 0x60ULL) && !Attacked(pos, 4, 1) && !Attacked(pos, 5, 1))
 		AddMove(movelist, &num_moves, 4, 6, PT_NB);
-	}
-	if (!only_captures && pos->castling[1] && !(all & 0xEULL) && !Attacked(pos, 4, 1) && !Attacked(pos, 3, 1)) {
+	if (!only_captures && pos->castling[1] && !(all & 0xEULL) && !Attacked(pos, 4, 1) && !Attacked(pos, 3, 1))
 		AddMove(movelist, &num_moves, 4, 2, PT_NB);
-	}
 	return num_moves;
 }
 
@@ -650,28 +798,14 @@ static int CenterSq(int sq) {
 	return Center(rank, file);
 }
 
-static int EvalMove(Position* pos, Move* bst, Move* m) {
-	int ptSou = PieceTypeOnSquare(pos, m->from);
-	int ptDes = PieceTypeOnSquare(pos, m->to);
-	int score = CenterSq(m->to) - CenterSq(m->from);
-	//int score = mx_pst[ptSou][m->from] - mx_pst[ptSou][m->to];
-	if ((m->from == bst->from) && (m->to == bst->to))
-		score += 10000;
-	if (ptDes != PT_NB)
-		score += mx_material[ptDes] - mx_material[ptSou] / 10;
-	if (m->promo < PT_NB)
-		score += mx_material[m->promo] - mx_material[PAWN];
-	return score;
-}
-
 static int EvalPosition(Position* pos) {
 	int phase = 0;
 	int scoreMg = 0;
 	int scoreEg = 0;
-	int insufficent[2] = { 0 };
+	int insufficient[2] = { 0 };
 	U64 bbBlockers = pos->color[0] | pos->color[1];
 	for (int c = WHITE; c < COLOR_NB; ++c) {
-		for (int pt = PAWN; pt < KING; ++pt) {
+		for (int pt = PAWN; pt < PT_NB; ++pt) {
 			U64 copy = pos->color[0] & pos->pieces[pt];
 			while (copy) {
 				const int fr = (int)LSB(copy);
@@ -679,17 +813,18 @@ static int EvalPosition(Position* pos) {
 				scoreMg += mg_pst[pt][fr];
 				scoreEg += eg_pst[pt][fr];
 				phase += phaseVal[pt];
-				insufficent[c] += insufVal[pt];
+				insufficient[c] += insufVal[pt];
 			}
 		}
 		FlipPosition(pos);
 		scoreMg = -scoreMg;
 		scoreEg = -scoreEg;
 	}
-	if (max(insufficent[0], insufficent[1]) < 3)
-		return 0;
-	if (phase > 24) phase = 24;
-	return (scoreMg * phase + scoreEg * (24 - phase)) / 24;
+	phase = min(24, phase);
+	int score = (scoreMg * phase + scoreEg * (24 - phase)) / 24;
+	if (max(insufficient[0], insufficient[1]) < 5)return 0;
+	if (insufficient[score < 0] < 4)return 0;
+	return (100 - pos->move50) * score / 100;
 }
 
 static void PrintBitboard(U64 bb) {
@@ -1008,7 +1143,7 @@ static int SearchAlpha(Position* pos, int alpha, int beta, int depth, int ply, S
 }
 
 static void SearchIteratively(Position* pos) {
-	memset(tt, 0, sizeof(tt));
+	TTClear();
 	int sc = 0, prev_sc = 0;
 	for (int depth = 1; depth <= info.depthLimit; ++depth) {
 		if (depth < 5)
@@ -1070,10 +1205,6 @@ static void UciBench(Position* pos) {
 		printf(" %2d. %8llu %12llu\n", info.depthLimit, elapsed, info.nodes);
 	}
 	PrintSummary(elapsed, info.nodes);
-}
-
-static void UciNewGame() {
-	memset(tt, 0, sizeof(tt));
 }
 
 static void ParsePosition(Position* pos, char* ptr) {
@@ -1141,7 +1272,7 @@ static void ParseGo(Position* pos, char* command) {
 
 static void UciCommand(Position* pos, char* line) {
 	if (strncmp(line, "ucinewgame", 10) == 0)
-		UciNewGame();
+		TTClear();
 	else if (!strncmp(line, "uci", 3)) {
 		printf("id name %s\nuciok\n", NAME);
 		fflush(stdout);
@@ -1168,6 +1299,7 @@ static void UciLoop(Position* pos) {
 int main(const int argc, const char** argv) {
 	Position pos;
 	Init();
+	InitMagics();
 	printf("%s %s\n", NAME, VERSION);
 	SetFen(&pos, START_FEN);
 	UciLoop(&pos);
