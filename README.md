@@ -20,7 +20,7 @@ FIDE-rules-compliant chess engine
 
 - Single file
 - Board 120 squares
-- Elo 2500
+- Elo 2000
 - En passant
 - Underpromotions (knight, bishop, rook)
 - Threefold repetition
