@@ -19,7 +19,8 @@ FIDE-rules-compliant chess engine
 ## Features
 
 - Single file
-- Board: bitboard
+- Board 120 squares
+- Elo 2500
 - En passant
 - Underpromotions (knight, bishop, rook)
 - Threefold repetition
