@@ -102,7 +102,7 @@ int eg_material[6] = { 94, 281, 297, 512,  936, 0 };
 const U64 tt_count = 64ULL << 15;
 int boardTo64[120];
 int hh[2][120][120];
-static int LINEAR_REDUCTION[64][64];
+int LINEAR_REDUCTION[64][64];
 TTEntry tt[64ULL << 15];
 SearchInfo info;
 Stack stack[MAX_PLY];
@@ -145,7 +145,7 @@ static U64 Rand64() {
 	return next;
 }
 
-static void Clear(Position* pos) {
+static void ClearBoard(Position* pos) {
 	for (int x = 0; x < 10; x++)
 		for (int y = 0; y < 12; y++)
 			pos->board[x + y * 10] = x > 0 && x < 9 && y>1 && y < 10 ? EMPTY : INVALID;
@@ -162,7 +162,7 @@ static void InitPst() {
 			switch (pt) {
 			case PAWN:
 				mg += file == FILE_D || file == FILE_E ? rank : 0;
-				eg += rank * 4;
+				eg += rank * 2;
 				break;
 			case KNIGHT:
 			case BISHOP:
@@ -319,7 +319,7 @@ static int IsRepetition(Position* pos, U64 hash) {
 static int IsPseudolegalMove(const Position* pos, const Move move) {
 	Move moves[256];
 	const int inCheck = IsSquareAttacked(pos, pos->kingSq[pos->color == BLACK], pos->color ^ COLOR_MASK);
-	const int num_moves = MoveGen(pos, moves, 0, inCheck);
+	const int num_moves = GenerateMoves(pos, moves, 0, inCheck);
 	for (int i = 0; i < num_moves; ++i)
 		if (moves[i].from == move.from && moves[i].to == move.to)
 			return 1;
@@ -378,7 +378,7 @@ static int EvalPosition(Position* pos) {
 
 static void SetFen(Position* pos, char* fen) {
 	memset(pos, 0, sizeof(Position));
-	Clear(pos);
+	ClearBoard(pos);
 	pos->ep = SQ_NB;
 	int sq = 21;
 	while (*fen && *fen != ' ') {
@@ -435,12 +435,11 @@ static void AddMove(Move* const moveList, int* num_moves, const int from, const 
 }
 
 static void AddPawnMove(Position* pos, Move* const moveList, int* num_moves, const int from, const int to, const int rank) {
-	if (rank == 6) {
+	if (rank != 6)
+		AddMove(moveList, num_moves, from, to, PT_NB);
+	else
 		for (int pt = KNIGHT; pt < KING; pt++)
 			AddMove(moveList, num_moves, from, to, pt);
-	}
-	else
-		AddMove(moveList, num_moves, from, to, PT_NB);
 }
 
 static void GeneratePawnMoves(Position* pos, Move* const moveList, int* num_moves, int sqFrom, int dy, int onlyCaptures) {
@@ -483,7 +482,7 @@ static void GeneratePieceMoves(Position* pos, Move* const moveList, int* num_mov
 		GeneratePieceMoves(pos, moveList, num_moves, sqFrom, dir, ++slider, onlyCaptures);
 }
 
-static int MoveGen(Position* pos, Move* const moveList, int onlyCaptures, int inCheck) {
+static int GenerateMoves(Position* pos, Move* const moveList, int onlyCaptures, int inCheck) {
 	int num_moves = 0;
 	for (int y = 0; y < 8; y++)
 		for (int x = 0; x < 8; x++) {
@@ -612,12 +611,10 @@ static int SearchAlpha(Position* pos, int alpha, int beta, int depth, int ply, i
 	}
 	else
 		depth -= depth > 3;
-
 	if (!inPv && !inCheck && !inQuiescence && ply) {
-		// REVERSE FUTILITY PRUNING (RFP)
-		if (depth <= 7 && staticEval - 70 * depth >= beta)return staticEval - 70 * depth;
-		// RAZORING: if eval is far below alpha even after the best capture,there is no point searching -- drop straight into qsearch.
-		//if (depth <= 3 && staticEval + 300 + 60 * depth < alpha)return SearchAlpha(pos, alpha, beta, 0, ply, 0);
+		// REVERSE FUTILITY PRUNING
+		if (depth <= 7 && staticEval - 70 * depth >= beta)
+			return staticEval - 70 * depth;
 		// NULL MOVE PRUNING
 		if (depth > 2 && staticEval >= beta && doNull && eval.phase[pos->color == BLACK]) {
 			Position npos = *pos;
@@ -629,7 +626,6 @@ static int SearchAlpha(Position* pos, int alpha, int beta, int depth, int ply, i
 				return score;
 		}
 	}
-
 	historyHash[historyCount++] = hash;
 	U8 tt_flag = LOWER;
 	int legalMoves = 0;
@@ -638,7 +634,7 @@ static int SearchAlpha(Position* pos, int alpha, int beta, int depth, int ply, i
 	Move movesList[256];
 	Move qList[256];
 	S64 scoreList[256];
-	const int num_moves = MoveGen(pos, movesList, inQuiescence, inCheck);
+	const int num_moves = GenerateMoves(pos, movesList, inQuiescence, inCheck);
 	for (int j = 0; j < num_moves; ++j) {
 		Move m = movesList[j];
 		const int ptSou = PieceTypeOnSquare(pos, m.from);
@@ -889,7 +885,7 @@ static void ResetInfo() {
 static inline void PerftDriver(Position* pos, int depth) {
 	Move moves[256];
 	const int inCheck = IsSquareAttacked(pos, pos->kingSq[pos->color == BLACK], pos->color ^ COLOR_MASK);
-	const int num_moves = MoveGen(pos, moves, 0, inCheck);
+	const int num_moves = GenerateMoves(pos, moves, 0, inCheck);
 	for (int n = 0; n < num_moves; n++) {
 		Position npos = *pos;
 		if (!MakeMove(&npos, &moves[n]))

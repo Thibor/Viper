@@ -4,7 +4,7 @@
 <img src="/Resources/Viper.png" />
     <br>
     <br>
-    <b><i>Single file small uci chess engine 2300 elo</i></b>
+    <b><i>Single file small uci chess engine 2000 elo</i></b>
     <br>
     <br>
     <img src="https://img.shields.io/github/downloads/Thibor/Viper/total?color=critical&style=for-the-badge">
@@ -18,9 +18,10 @@ FIDE-rules-compliant chess engine
 
 ## Features
 
+- Elo 2000
+- Protocol UCI
 - Single file
 - Board 120 squares
-- Elo 2000
 - En passant
 - Underpromotions (knight, bishop, rook)
 - Threefold repetition
